@@ -3,6 +3,7 @@
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
+import { MongoCluster } from '@azure/arm-cosmosdb';
 import { DatabaseAccountGetResults } from '@azure/arm-cosmosdb/src/models';
 import { appendExtensionUserAgent, AzExtParentTreeItem, AzExtTreeItem, ICreateChildImplContext, parseError } from '@microsoft/vscode-azext-utils';
 import { MongoClient } from 'mongodb';
@@ -24,16 +25,22 @@ export class MongoAccountTreeItem extends AzExtParentTreeItem {
     public readonly childTypeLabel: string = "Database";
     public readonly label: string;
     public readonly connectionString: string;
+    public readonly isVCoreAccount: boolean;
 
     private _root: IMongoTreeRoot;
 
-    constructor(parent: AzExtParentTreeItem, id: string, label: string, connectionString: string, isEmulator: boolean | undefined, readonly databaseAccount?: DatabaseAccountGetResults) {
+    constructor(parent: AzExtParentTreeItem, id: string, label: string, connectionString: string, isEmulator: boolean | undefined, readonly databaseAccount?: DatabaseAccountGetResults, readonly mongoCluster?: MongoCluster) {
         super(parent);
         this.id = id;
         this.label = label;
         this.connectionString = connectionString;
         this._root = { isEmulator };
         this.valuesToMask.push(connectionString);
+        if (mongoCluster) {
+            this.isVCoreAccount = true;
+        } else {
+            this.isVCoreAccount = false;
+        }
     }
 
     // overrides ISubscriptionContext with an object that also has Mongo info

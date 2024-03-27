@@ -3,9 +3,9 @@
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
-import { CosmosDBManagementClient } from '@azure/arm-cosmosdb';
+import { CosmosDBManagementClient, MongoCluster } from '@azure/arm-cosmosdb';
 import { DatabaseAccountGetResults, DatabaseAccountListKeysResult } from '@azure/arm-cosmosdb/src/models';
-import { getResourceGroupFromId, ILocationWizardContext, LocationListStep, ResourceGroupListStep, SubscriptionTreeItemBase, uiUtils } from '@microsoft/vscode-azext-azureutils';
+import { ILocationWizardContext, LocationListStep, ResourceGroupListStep, SubscriptionTreeItemBase, getResourceGroupFromId, uiUtils } from '@microsoft/vscode-azext-azureutils';
 import { AzExtParentTreeItem, AzExtTreeItem, AzureWizard, AzureWizardPromptStep, IActionContext } from '@microsoft/vscode-azext-utils';
 import * as vscode from 'vscode';
 import { API, Experience, getExperienceLabel, tryGetExperience } from '../AzureDBExperiences';
@@ -16,7 +16,7 @@ import { GraphAccountTreeItem } from "../graph/tree/GraphAccountTreeItem";
 import { MongoAccountTreeItem } from '../mongo/tree/MongoAccountTreeItem';
 import { PostgresAbstractServer, PostgresServerType } from '../postgres/abstract/models';
 import { IPostgresServerWizardContext } from '../postgres/commands/createPostgresServer/IPostgresServerWizardContext';
-import { createPostgresConnectionString, ParsedPostgresConnectionString, parsePostgresConnectionString } from '../postgres/postgresConnectionStrings';
+import { ParsedPostgresConnectionString, createPostgresConnectionString, parsePostgresConnectionString } from '../postgres/postgresConnectionStrings';
 import { PostgresServerTreeItem } from '../postgres/tree/PostgresServerTreeItem';
 import { TableAccountTreeItem } from "../table/tree/TableAccountTreeItem";
 import { createActivityContext } from '../utils/activityUtils';
@@ -131,7 +131,7 @@ export class SubscriptionTreeItem extends SubscriptionTreeItemBase {
             }
 
             // Use the default connection string
-            return new MongoAccountTreeItem(parent, id, label, connectionString.toString(), isEmulator, databaseAccount);
+            return new MongoAccountTreeItem(parent, id, label, connectionString.toString(), isEmulator, databaseAccount, undefined);
         } else {
             const keyResult: DatabaseAccountListKeysResult = await client.databaseAccounts.listKeys(resourceGroup, name);
             const primaryMasterKey: string = nonNullProp(keyResult, 'primaryMasterKey');
@@ -150,6 +150,19 @@ export class SubscriptionTreeItem extends SubscriptionTreeItemBase {
             }
         }
     }
+
+    public static async initMongoVCoreChild(client: CosmosDBManagementClient, mongoCluster: MongoCluster, parent: AzExtParentTreeItem): Promise<AzExtTreeItem> {
+        const id: string = nonNullProp(mongoCluster, 'id');
+        const name: string = nonNullProp(mongoCluster, 'name');
+        const resourceGroup: string = getResourceGroupFromId(id);
+
+        const result = await client.mongoClusters.listConnectionStrings(resourceGroup, name);
+        var connString: string = nonNullProp(nonNullProp(result, 'connectionStrings')[0], 'connectionString');
+
+        // Use the default connection string
+        return new MongoAccountTreeItem(parent, id, name, connString, false, undefined, mongoCluster);
+    }
+
     public static async initPostgresChild(server: PostgresAbstractServer, parent: AzExtParentTreeItem): Promise<AzExtTreeItem> {
         const connectionString: string = createPostgresConnectionString(nonNullProp(server, 'fullyQualifiedDomainName'));
         const parsedCS: ParsedPostgresConnectionString = parsePostgresConnectionString(connectionString);

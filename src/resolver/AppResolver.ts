@@ -3,6 +3,7 @@
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
+import { MongoCluster } from "@azure/arm-cosmosdb";
 import { getResourceGroupFromId } from "@microsoft/vscode-azext-azureutils";
 import { AzExtParentTreeItem, AzExtTreeItem, callWithTelemetryAndErrorHandling, IActionContext, ISubscriptionContext, nonNullProp, nonNullValue } from "@microsoft/vscode-azext-utils";
 import { AppResource, AppResourceResolver } from "@microsoft/vscode-azext-utils/hostapi";
@@ -21,6 +22,7 @@ import { ResolvedPostgresServerResource } from "./ResolvedPostgresServerResource
 
 const resourceTypes = [
     'microsoft.documentdb/databaseaccounts',
+    'microsoft.documentdb/mongoclusters',
     'microsoft.dbforpostgresql/servers',
     'microsoft.dbforpostgresql/flexibleservers'
 ];
@@ -33,6 +35,7 @@ export class DatabaseResolver implements AppResourceResolver {
                 const resourceGroupName = getResourceGroupFromId(nonNullProp(resource, 'id'));
                 const name = nonNullProp(resource, 'name');
                 let postgresServer: PostgresAbstractServer;
+                let mongoVCoreCluster: MongoCluster;
                 let dbChild: AzExtTreeItem;
 
                 switch (resource.type.toLowerCase()) {
@@ -46,7 +49,14 @@ export class DatabaseResolver implements AppResourceResolver {
                             new ResolvedMongoAccountResource(dbChild as MongoAccountTreeItem, resource) :
                             new ResolvedDocDBAccountResource(dbChild as DocDBAccountTreeItem, resource);
                     case resourceTypes[1]:
+                        const cosmosClient = await createCosmosDBClient({ ...context, ...subContext });
+
+                        mongoVCoreCluster = await cosmosClient.mongoClusters.get(resourceGroupName, name);
+                        dbChild = await SubscriptionTreeItem.initMongoVCoreChild(cosmosClient, mongoVCoreCluster, nonNullValue(subNode));
+
+                        return new ResolvedMongoAccountResource(dbChild as MongoAccountTreeItem, resource);
                     case resourceTypes[2]:
+                    case resourceTypes[3]:
                         const postgresClient = resource.type.toLowerCase() === resourceTypes[1] ?
                             await createPostgreSQLClient({ ...context, ...subContext }) :
                             await createPostgreSQLFlexibleClient({ ...context, ...subContext });
